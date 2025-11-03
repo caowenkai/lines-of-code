@@ -1,6 +1,13 @@
 # 📊 代码统计工具
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.6-blue.svg)](https://www.python.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 一个自动化统计 Git 仓库代码量的全栈工具，支持批量分析多个仓库，统计每个提交者的代码贡献。
+
+> **注意**：发布到 GitHub 前，请将上方的仓库链接替换为你的实际仓库地址。
 
 ## ✨ 功能特性
 
