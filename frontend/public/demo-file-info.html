@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器文件信息获取演示</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .demo-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .drop-zone:hover {
+            background: #e8f4fd;
+            border-color: #764ba2;
+        }
+        .drop-zone.dragover {
+            background: #d1f4e0;
+            border-color: #10b981;
+            transform: scale(1.02);
+        }
+        .file-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .info-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .label {
+            font-weight: 600;
+            color: #667eea;
+            display: inline-block;
+            width: 150px;
+        }
+        .value {
+            color: #333;
+        }
+        .available {
+            color: #10b981;
+            font-weight: 600;
+        }
+        .unavailable {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        .explanation {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin-top: 20px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: Monaco, Consolas, monospace;
+            color: #e83e8c;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-box">
+        <h1>🔍 浏览器文件信息获取演示</h1>
+        <p>拖拽一个文件或文件夹到下方区域，看看浏览器能获取到什么信息：</p>
+        
+        <div class="drop-zone" id="dropZone">
+            📂 拖拽文件或文件夹到这里<br>
+            <small>或点击选择</small>
+        </div>
+        
+        <input type="file" id="fileInput" style="display: none;" webkitdirectory>
+        
+        <div id="result"></div>
+    </div>
+
+    <div class="demo-box explanation">
+        <h3>💡 关键说明</h3>
+        <p><strong>浏览器可以获取：</strong></p>
+        <ul>
+            <li>✅ 文件名 (<code>file.name</code>)</li>
+            <li>✅ 文件大小 (<code>file.size</code>)</li>
+            <li>✅ 文件类型 (<code>file.type</code>)</li>
+            <li>✅ 修改时间 (<code>file.lastModified</code>)</li>
+            <li>✅ 文件内容（可以读取并上传）</li>
+            <li>✅ 相对路径 (<code>file.webkitRelativePath</code>) - 仅文件夹选择时</li>
+        </ul>
+        
+        <p><strong>浏览器无法获取：</strong></p>
+        <ul>
+            <li>❌ 完整文件系统路径 (<code>file.path</code> 在浏览器中是 undefined)</li>
+            <li>❌ 父目录路径</li>
+            <li>❌ 文件在磁盘上的绝对位置</li>
+        </ul>
+        
+        <p><strong>原因：</strong>这是浏览器的安全限制，防止网站探测用户的文件系统结构，保护用户隐私。</p>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const result = document.getElementById('result');
+
+        // 点击选择
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                displayFileInfo(e.target.files[0]);
+            }
+        });
+
+        // 拖拽事件
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const items = e.dataTransfer.items;
+            if (items && items.length > 0) {
+                const item = items[0];
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    displayFileInfo(file);
+                    
+                    // 尝试获取目录入口
+                    const entry = item.webkitGetAsEntry();
+                    if (entry) {
+                        displayEntryInfo(entry);
+                    }
+                }
+            }
+        });
+
+        function displayFileInfo(file) {
+            console.log('File对象：', file);
+            
+            let html = '<div class="file-info">';
+            html += '<h3>📄 浏览器可以获取的信息：</h3>';
+            
+            html += `<div class="info-item">
+                <span class="label">file.name:</span>
+                <span class="value available">${file.name}</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">file.size:</span>
+                <span class="value available">${file.size} 字节</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">file.type:</span>
+                <span class="value available">${file.type || '(空)'}</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">file.lastModified:</span>
+                <span class="value available">${new Date(file.lastModified).toLocaleString()}</span>
+            </div>`;
+            
+            if (file.webkitRelativePath) {
+                html += `<div class="info-item">
+                    <span class="label">webkitRelativePath:</span>
+                    <span class="value available">${file.webkitRelativePath}</span>
+                </div>`;
+            }
+            
+            html += '<h3>❌ 浏览器无法获取的信息：</h3>';
+            
+            html += `<div class="info-item">
+                <span class="label">file.path:</span>
+                <span class="value unavailable">${file.path || 'undefined'}</span>
+                <small style="color: #666;"> ← 浏览器中总是 undefined</small>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">完整路径:</span>
+                <span class="value unavailable">无法获取</span>
+                <small style="color: #666;"> ← 出于安全考虑</small>
+            </div>`;
+            
+            html += '</div>';
+            result.innerHTML = html;
+        }
+
+        function displayEntryInfo(entry) {
+            console.log('Entry对象：', entry);
+            
+            let html = result.innerHTML;
+            html += '<div class="file-info">';
+            html += '<h3>📂 目录入口信息（webkitGetAsEntry）：</h3>';
+            
+            html += `<div class="info-item">
+                <span class="label">entry.name:</span>
+                <span class="value available">${entry.name}</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">entry.isFile:</span>
+                <span class="value available">${entry.isFile}</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">entry.isDirectory:</span>
+                <span class="value available">${entry.isDirectory}</span>
+            </div>`;
+            
+            html += `<div class="info-item">
+                <span class="label">entry.fullPath:</span>
+                <span class="value available">${entry.fullPath}</span>
+                <small style="color: #666;"> ← 这只是相对路径，不是完整系统路径</small>
+            </div>`;
+            
+            html += '</div>';
+            result.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
+
