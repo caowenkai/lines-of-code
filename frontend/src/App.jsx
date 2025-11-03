@@ -1,128 +1,15 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import axios from 'axios'
 import './App.css'
 
 function App() {
   const [folderPath, setFolderPath] = useState('')
-  const [parentPath, setParentPath] = useState('')
   const [selectedBranch, setSelectedBranch] = useState('--all')
   const [loading, setLoading] = useState(false)
   const [repoStats, setRepoStats] = useState([])
   const [totalStats, setTotalStats] = useState(null)
   const [error, setError] = useState('')
-  const [isDragging, setIsDragging] = useState(false)
-  const [selectedFolderName, setSelectedFolderName] = useState('')
-  const [usePathBuilder, setUsePathBuilder] = useState(false)
-  const fileInputRef = useRef(null)
-
-  // 处理文件夹选择
-  const handleFolderSelect = (event) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      // 从第一个文件的路径中提取文件夹路径
-      const firstFile = files[0]
-      // webkitRelativePath 格式: "folder/subfolder/file.txt"
-      const relativePath = firstFile.webkitRelativePath
-      const folderName = relativePath.split('/')[0]
-      
-      // 尝试使用 File System Access API 获取完整路径
-      if (firstFile.path) {
-        // Electron 或某些环境下可能有 path 属性
-        const fullPath = firstFile.path.substring(0, firstFile.path.lastIndexOf('/'))
-        setFolderPath(fullPath)
-        setSelectedFolderName('')
-        setUsePathBuilder(false)
-        setError('')
-      } else {
-        // 浏览器环境下，切换到路径构建模式
-        setSelectedFolderName(folderName)
-        setUsePathBuilder(true)
-        // 如果有父路径，自动拼接
-        if (parentPath.trim()) {
-          const fullPath = parentPath.endsWith('/') 
-            ? `${parentPath}${folderName}` 
-            : `${parentPath}/${folderName}`
-          setFolderPath(fullPath)
-        }
-        setError('')
-      }
-    }
-  }
-
-  // 打开文件夹选择器
-  const openFolderPicker = () => {
-    // 检查是否输入了父路径
-    if (!parentPath.trim()) {
-      setError('请先在上方输入父目录路径（例如：/Users/username/projects）')
-      return
-    }
-    
-    // 尝试使用现代的 File System Access API
-    if ('showDirectoryPicker' in window) {
-      window.showDirectoryPicker()
-        .then(async (dirHandle) => {
-          // 获取文件夹名称
-          const folderName = dirHandle.name
-          setSelectedFolderName(folderName)
-          setUsePathBuilder(true)
-          // 自动拼接完整路径
-          const fullPath = parentPath.endsWith('/') 
-            ? `${parentPath}${folderName}` 
-            : `${parentPath}/${folderName}`
-          setFolderPath(fullPath)
-          setError('')
-        })
-        .catch((err) => {
-          if (err.name !== 'AbortError') {
-            console.error('文件夹选择失败:', err)
-          }
-        })
-    } else {
-      // 降级使用传统的 input[type="file"]
-      fileInputRef.current?.click()
-    }
-  }
-
-  // 处理拖放
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-
-    const items = e.dataTransfer.items
-    if (items && items.length > 0) {
-      const item = items[0]
-      if (item.kind === 'file') {
-        const entry = item.webkitGetAsEntry()
-        if (entry && entry.isDirectory) {
-          // 获取文件夹名称
-          const folderName = entry.name
-          setSelectedFolderName(folderName)
-          setUsePathBuilder(true)
-          // 如果有父路径，自动拼接
-          if (parentPath.trim()) {
-            const fullPath = parentPath.endsWith('/') 
-              ? `${parentPath}${folderName}` 
-              : `${parentPath}/${folderName}`
-            setFolderPath(fullPath)
-          }
-          setError('')
-        }
-      }
-    }
-  }
+  const [showHelp, setShowHelp] = useState(false)
 
   const handleAnalyze = async () => {
     if (!folderPath.trim()) {
@@ -166,220 +53,54 @@ function App() {
       </header>
 
       <div className="container">
-        <div className="two-column-layout">
-          {/* 左侧：输入配置区 */}
-          <div className="left-panel">
-            <div className="panel-header">
-              <h2>⚙️ 配置分析参数</h2>
-            </div>
-
-            {/* 文件夹路径输入 */}
-            <div className="config-section">
-              <h3>📁 选择文件夹</h3>
-              
-              <div className="input-group">
-                <label htmlFor="folderPath">文件夹完整路径</label>
-                <input
-                  id="folderPath"
-                  type="text"
-                  value={folderPath}
-                  onChange={(e) => setFolderPath(e.target.value)}
-                  placeholder="/Users/username/projects"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAnalyze()}
-                  className="path-input"
-                />
-              </div>
-
-              {/* 分步输入选项 */}
-              <div className="advanced-options">
+        {/* 简化的输入区 */}
+        <div className="simple-input-section">
+          <div className="input-card">
+            <div className="input-group">
+              <label htmlFor="folderPath">📂 文件夹路径</label>
+              <input
+                id="folderPath"
+                type="text"
+                value={folderPath}
+                onChange={(e) => setFolderPath(e.target.value)}
+                placeholder="粘贴文件夹完整路径，如：/Users/username/projects"
+                onKeyPress={(e) => e.key === 'Enter' && handleAnalyze()}
+                className="path-input-simple"
+              />
+              <p className="input-hint">
+                ⚠️ 浏览器无法自动获取文件系统路径，请手动粘贴完整路径
                 <button 
-                  className="toggle-btn"
-                  onClick={() => setUsePathBuilder(!usePathBuilder)}
+                  className="help-link"
+                  onClick={() => setShowHelp(true)}
                 >
-                  {usePathBuilder ? '📝 切换到直接输入' : '🔧 使用分步输入'}
+                  查看如何获取路径 →
                 </button>
-              </div>
-
-              {usePathBuilder && (
-                <div className="path-builder">
-                  <div className="input-group">
-                    <label htmlFor="parentPath">父目录路径</label>
-                    <input
-                      id="parentPath"
-                      type="text"
-                      value={parentPath}
-                      onChange={(e) => setParentPath(e.target.value)}
-                      placeholder="/Users/username/projects"
-                      className="path-input"
-                    />
-                  </div>
-                  
-                  <div className="input-group">
-                    <label>选择子文件夹</label>
-                    <button 
-                      className="select-folder-btn" 
-                      onClick={openFolderPicker}
-                      type="button"
-                    >
-                      📁 打开文件选择器
-                    </button>
-                    {selectedFolderName && (
-                      <div className="selected-info">
-                        ✅ 已选择：<strong>{selectedFolderName}</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              </p>
             </div>
 
-            {/* 拖放区域 */}
-            {usePathBuilder && (
-              <div 
-                className={`drop-zone-compact ${isDragging ? 'dragging' : ''}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
+            <div className="input-group">
+              <label htmlFor="branchSelect">🌳 统计分支</label>
+              <select
+                id="branchSelect"
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="branch-select-simple"
               >
-                <span className="drop-icon">📂</span>
-                <span className="drop-text">
-                  {isDragging ? '松开选择' : '拖放文件夹'}
-                </span>
-              </div>
-            )}
-
-            {/* 分支选择 */}
-            <div className="config-section">
-              <h3>🌳 选择分支</h3>
-              
-              <div className="input-group">
-                <select
-                  id="branchSelect"
-                  value={selectedBranch}
-                  onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="branch-select"
-                >
-                  <option value="--all">🌳 所有分支</option>
-                  <option value="master">master</option>
-                  <option value="main">main</option>
-                  <option value="develop">develop</option>
-                  <option value="dev">dev</option>
-                </select>
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="customBranch">自定义分支</label>
-                <input
-                  id="customBranch"
-                  type="text"
-                  className="branch-input"
-                  placeholder="输入其他分支名后按回车..."
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.target.value.trim()) {
-                      setSelectedBranch(e.target.value.trim())
-                      e.target.value = ''
-                    }
-                  }}
-                />
-              </div>
+                <option value="--all">所有分支</option>
+                <option value="master">master</option>
+                <option value="main">main</option>
+                <option value="develop">develop</option>
+                <option value="dev">dev</option>
+              </select>
             </div>
 
-            {/* 分析按钮 */}
             <button 
-              className="analyze-btn-large" 
+              className="analyze-btn"
               onClick={handleAnalyze}
               disabled={loading}
             >
               {loading ? '⏳ 分析中...' : '🚀 开始分析'}
             </button>
-
-            {/* 隐藏的文件输入元素 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              webkitdirectory="true"
-              directory="true"
-              multiple
-              onChange={handleFolderSelect}
-              style={{ display: 'none' }}
-            />
-          </div>
-
-          {/* 右侧：使用说明区 */}
-          <div className="right-panel">
-            <div className="panel-header">
-              <h2>💡 使用说明</h2>
-            </div>
-
-            <div className="guide-section">
-              <div className="guide-item">
-                <div className="guide-number">1</div>
-                <div className="guide-content">
-                  <h4>输入文件夹路径</h4>
-                  <p>在左侧输入框中输入要分析的文件夹完整路径</p>
-                  <div className="guide-example">
-                    <code>/Users/username/projects</code>
-                  </div>
-                </div>
-              </div>
-
-              <div className="guide-item">
-                <div className="guide-number">2</div>
-                <div className="guide-content">
-                  <h4>或使用分步输入</h4>
-                  <p>点击"使用分步输入"，先输入父目录，再选择子文件夹</p>
-                  <ul>
-                    <li>输入父目录路径</li>
-                    <li>点击"打开文件选择器"</li>
-                    <li>路径自动拼接完成</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="guide-item">
-                <div className="guide-number">3</div>
-                <div className="guide-content">
-                  <h4>选择统计分支</h4>
-                  <p>选择要统计的Git分支，默认统计所有分支</p>
-                  <ul>
-                    <li>所有分支：统计全部分支</li>
-                    <li>特定分支：只统计该分支</li>
-                    <li>自定义：输入任意分支名</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="guide-item">
-                <div className="guide-number">4</div>
-                <div className="guide-content">
-                  <h4>开始分析</h4>
-                  <p>点击"开始分析"按钮，等待统计完成</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="tips-section">
-              <h4>⚠️ 重要提示</h4>
-              <ul className="tips-list">
-                <li><strong>浏览器限制：</strong>Web浏览器无法自动获取文件系统路径，需手动输入</li>
-                <li><strong>路径格式：</strong>必须是绝对路径，如 /Users/xxx/projects</li>
-                <li><strong>权限要求：</strong>确保有读取目标文件夹的权限</li>
-                <li><strong>大型仓库：</strong>分析可能需要较长时间，请耐心等待</li>
-              </ul>
-            </div>
-
-            <div className="quick-links">
-              <h4>📚 快速链接</h4>
-              <a href="./demo-file-info.html" target="_blank" className="link-btn">
-                🔬 浏览器限制演示
-              </a>
-              <a href="#" className="link-btn" onClick={(e) => {
-                e.preventDefault()
-                alert('功能文档：详见 README.md 和 BRANCH_FEATURE.md')
-              }}>
-                📖 查看完整文档
-              </a>
-            </div>
           </div>
         </div>
 
@@ -480,14 +201,103 @@ function App() {
           <div className="placeholder">
             <p>✨ 开始使用</p>
             <p className="placeholder-hint">
-              1️⃣ 点击"📁 选择"按钮选择文件夹<br/>
-              2️⃣ 或拖放文件夹到上方区域<br/>
-              3️⃣ 或直接输入文件夹完整路径<br/>
-              4️⃣ 点击"开始分析"按钮
+              粘贴文件夹路径 → 选择分支 → 点击分析
             </p>
           </div>
         )}
       </div>
+
+      {/* 使用说明弹窗 */}
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>💡 使用说明</h2>
+              <button className="close-btn" onClick={() => setShowHelp(false)}>✕</button>
+            </div>
+            
+            <div className="modal-body">
+              <section className="help-section">
+                <h3>📂 如何获取文件夹路径？</h3>
+                
+                <div className="help-item">
+                  <h4>🍎 macOS 用户</h4>
+                  <ol>
+                    <li>在「访达」中找到目标文件夹</li>
+                    <li>右键点击文件夹</li>
+                    <li>按住 <kbd>Option</kbd> 键</li>
+                    <li>选择「拷贝"文件夹名"作为路径名称」</li>
+                    <li>粘贴到路径输入框</li>
+                  </ol>
+                  <div className="path-example">
+                    示例：<code>/Users/username/projects</code>
+                  </div>
+                </div>
+
+                <div className="help-item">
+                  <h4>🪟 Windows 用户</h4>
+                  <ol>
+                    <li>在「文件资源管理器」中打开文件夹</li>
+                    <li>点击地址栏（或按 <kbd>Ctrl+L</kbd>）</li>
+                    <li>路径会被全选，<kbd>Ctrl+C</kbd> 复制</li>
+                    <li>粘贴到路径输入框</li>
+                  </ol>
+                  <div className="path-example">
+                    示例：<code>C:\Users\username\projects</code>
+                  </div>
+                </div>
+
+                <div className="help-item">
+                  <h4>🐧 Linux 用户</h4>
+                  <ol>
+                    <li>在文件管理器中右键点击文件夹</li>
+                    <li>选择「复制路径」或「属性」查看路径</li>
+                    <li>或在终端使用 <code>pwd</code> 命令</li>
+                  </ol>
+                  <div className="path-example">
+                    示例：<code>/home/username/projects</code>
+                  </div>
+                </div>
+              </section>
+
+              <section className="help-section">
+                <h3>⚠️ 重要提示</h3>
+                <ul className="tips-list">
+                  <li><strong>浏览器限制：</strong>由于浏览器安全策略，Web应用无法直接访问您的文件系统路径，必须手动输入</li>
+                  <li><strong>绝对路径：</strong>必须输入完整的绝对路径，不能使用相对路径（如 <code>./folder</code>）</li>
+                  <li><strong>读取权限：</strong>确保您对目标文件夹有读取权限</li>
+                  <li><strong>耗时说明：</strong>大型仓库或多个仓库的分析可能需要较长时间，请耐心等待</li>
+                </ul>
+              </section>
+
+              <section className="help-section">
+                <h3>🌳 分支选择说明</h3>
+                <ul className="tips-list">
+                  <li><strong>所有分支：</strong>统计仓库中所有分支的代码提交</li>
+                  <li><strong>指定分支：</strong>只统计选定分支的代码提交</li>
+                  <li><strong>使用场景：</strong>如果只关心主分支代码量，选择 main 或 master</li>
+                </ul>
+              </section>
+
+              <section className="help-section">
+                <h3>📊 统计指标说明</h3>
+                <ul className="tips-list">
+                  <li><strong>添加行数：</strong>该提交者新增的代码行数</li>
+                  <li><strong>删除行数：</strong>该提交者删除的代码行数</li>
+                  <li><strong>总改动量：</strong>添加 + 删除的总和，衡量代码活跃度</li>
+                  <li><strong>提交次数：</strong>Git commit 的总次数</li>
+                </ul>
+              </section>
+            </div>
+
+            <div className="modal-footer">
+              <button className="close-btn-large" onClick={() => setShowHelp(false)}>
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
