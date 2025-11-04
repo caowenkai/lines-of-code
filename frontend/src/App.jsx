@@ -12,6 +12,8 @@ function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [logs, setLogs] = useState([])
   const [showTerminal, setShowTerminal] = useState(false)
+  const [isTerminalMinimized, setIsTerminalMinimized] = useState(false)
+  const [repoLoadingStates, setRepoLoadingStates] = useState({}) // 记录每个仓库的加载状态
   const eventSourceRef = useRef(null)
   const logsEndRef = useRef(null)
   const sessionIdRef = useRef(null)
@@ -83,6 +85,7 @@ function App() {
     setTotalStats(null)
     setLogs([])
     setShowTerminal(true)
+    setIsTerminalMinimized(false) // 开始分析时自动展开终端
 
     // 生成唯一的会话ID
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -101,7 +104,12 @@ function App() {
       })
 
       if (response.data.success) {
-        setRepoStats(response.data.data.repositories)
+        // 为每个仓库添加当前选中的分支（默认为所有分支）
+        const reposWithBranch = response.data.data.repositories.map(repo => ({
+          ...repo,
+          currentBranch: '--all'
+        }))
+        setRepoStats(reposWithBranch)
         setTotalStats(response.data.data.total)
       } else {
         setError(response.data.message || '分析失败')
@@ -111,6 +119,77 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 重新分析单个仓库
+  const handleReanalyzeRepo = async (repoIndex, repoPath, branch) => {
+    const repoKey = `${repoPath}_${branch}`
+    setRepoLoadingStates(prev => ({ ...prev, [repoKey]: true }))
+    
+    // 自动展开终端窗口
+    if (sessionIdRef.current) {
+      setShowTerminal(true)
+      setIsTerminalMinimized(false)
+    }
+    
+    try {
+      const response = await axios.post('/api/analyze-repo', {
+        repoPath: repoPath,
+        branch: branch,
+        sessionId: sessionIdRef.current
+      })
+
+      if (response.data.success) {
+        // 更新该仓库的数据
+        setRepoStats(prev => {
+          const newStats = [...prev]
+          newStats[repoIndex] = {
+            ...response.data.data,
+            currentBranch: branch
+          }
+          return newStats
+        })
+        
+        // 重新计算总体统计
+        recalculateTotalStats()
+      } else {
+        setError(response.data.message || '重新分析失败')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || '重新分析失败')
+    } finally {
+      setRepoLoadingStates(prev => ({ ...prev, [repoKey]: false }))
+    }
+  }
+
+  // 重新计算总体统计
+  const recalculateTotalStats = () => {
+    if (repoStats.length === 0) return
+
+    const allContributors = new Set()
+    let totalAdded = 0
+    let totalDeleted = 0
+    let totalChanges = 0
+    let totalCommits = 0
+
+    repoStats.forEach(repo => {
+      repo.contributors.forEach(contributor => {
+        allContributors.add(contributor.author)
+        totalAdded += contributor.added
+        totalDeleted += contributor.deleted
+        totalChanges += contributor.totalChanges
+        totalCommits += contributor.commits
+      })
+    })
+
+    setTotalStats({
+      repositoryCount: repoStats.length,
+      contributorCount: allContributors.size,
+      totalAdded,
+      totalDeleted,
+      totalChanges,
+      totalCommits
+    })
   }
 
   const clearLogs = () => {
@@ -230,22 +309,56 @@ function App() {
 
         {repoStats.length > 0 && (
           <div className="repos-section">
-            {repoStats.map((repo, index) => (
-              <div key={index} className="repo-card">
-                <h3 className="repo-title">
-                  🗂️ {repo.name}
-                  <span className="repo-branch">📌 {repo.branch}</span>
-                  <span className="repo-path">{repo.path}</span>
-                  {repo.branches && repo.branches.length > 0 && (
-                    <span className="repo-branches-info">
-                      🌿 共 {repo.branches.length} 个分支
-                    </span>
+            {repoStats.map((repo, index) => {
+              const repoKey = `${repo.path}_${repo.currentBranch}`
+              const isRepoLoading = repoLoadingStates[repoKey]
+              
+              return (
+                <div key={index} className={`repo-card ${isRepoLoading ? 'loading' : ''}`}>
+                  <div className="repo-header">
+                    <div className="repo-title-section">
+                      <h3 className="repo-title">
+                        🗂️ {repo.name}
+                      </h3>
+                      <span className="repo-path">{repo.path}</span>
+                    </div>
+                    
+                    <div className="repo-branch-selector">
+                      <label htmlFor={`branch-${index}`} className="branch-label">
+                        🌳 分支:
+                      </label>
+                      <select
+                        id={`branch-${index}`}
+                        value={repo.currentBranch || '--all'}
+                        onChange={(e) => handleReanalyzeRepo(index, repo.path, e.target.value)}
+                        className="branch-select"
+                        disabled={isRepoLoading}
+                      >
+                        <option value="--all">所有分支</option>
+                        {repo.branches && repo.branches.map((branch, idx) => (
+                          <option key={idx} value={branch}>{branch}</option>
+                        ))}
+                      </select>
+                      {isRepoLoading && <span className="loading-spinner">⏳</span>}
+                    </div>
+                  </div>
+                  
+                  {/* 加载遮罩 */}
+                  {isRepoLoading && (
+                    <div className="repo-loading-overlay">
+                      <div className="loading-content">
+                        <div className="loading-spinner-large">🔄</div>
+                        <p className="loading-text">正在重新分析分支数据...</p>
+                        <p className="loading-subtext">
+                          分支: {repo.currentBranch === '--all' ? '所有分支' : repo.currentBranch}
+                        </p>
+                      </div>
+                    </div>
                   )}
-                </h3>
                 
-                {repo.contributors.length === 0 ? (
+                {!isRepoLoading && repo.contributors.length === 0 ? (
                   <div className="no-data">该仓库暂无提交记录</div>
-                ) : (
+                ) : !isRepoLoading ? (
                   <div className="table-container">
                     <table className="stats-table">
                       <thead>
@@ -277,9 +390,19 @@ function App() {
                       </tbody>
                     </table>
                   </div>
+                ) : (
+                  /* 骨架屏 */
+                  <div className="skeleton-table">
+                    <div className="skeleton-row skeleton-header"></div>
+                    <div className="skeleton-row"></div>
+                    <div className="skeleton-row"></div>
+                    <div className="skeleton-row"></div>
+                    <div className="skeleton-row"></div>
+                  </div>
                 )}
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -295,13 +418,23 @@ function App() {
 
         {/* 终端日志窗口 */}
         {showTerminal && (
-          <div className="terminal-panel">
+          <div className={`terminal-panel ${isTerminalMinimized ? 'minimized' : ''}`}>
             <div className="terminal-header">
               <div className="terminal-title">
                 <span className="terminal-icon">💻</span>
                 <span>实时日志</span>
+                {isTerminalMinimized && logs.length > 0 && (
+                  <span className="log-count">{logs.length}</span>
+                )}
               </div>
               <div className="terminal-actions">
+                <button 
+                  className="terminal-btn"
+                  onClick={() => setIsTerminalMinimized(!isTerminalMinimized)}
+                  title={isTerminalMinimized ? "展开" : "最小化"}
+                >
+                  {isTerminalMinimized ? '⬆️' : '⬇️'}
+                </button>
                 <button 
                   className="terminal-btn"
                   onClick={clearLogs}
@@ -318,27 +451,29 @@ function App() {
                 </button>
               </div>
             </div>
-            <div className="terminal-body">
-              {logs.length === 0 ? (
-                <div className="terminal-empty">
-                  等待日志输出...
-                </div>
-              ) : (
-                logs.map((log, index) => (
-                  <div 
-                    key={index} 
-                    className="terminal-log"
-                    style={{ color: getLogColor(log.type) }}
-                  >
-                    <span className="log-time">
-                      [{log.timestamp.toLocaleTimeString()}]
-                    </span>
-                    <span className="log-message">{log.message}</span>
+            {!isTerminalMinimized && (
+              <div className="terminal-body">
+                {logs.length === 0 ? (
+                  <div className="terminal-empty">
+                    等待日志输出...
                   </div>
-                ))
-              )}
-              <div ref={logsEndRef} />
-            </div>
+                ) : (
+                  logs.map((log, index) => (
+                    <div 
+                      key={index} 
+                      className="terminal-log"
+                      style={{ color: getLogColor(log.type) }}
+                    >
+                      <span className="log-time">
+                        [{log.timestamp.toLocaleTimeString()}]
+                      </span>
+                      <span className="log-message">{log.message}</span>
+                    </div>
+                  ))
+                )}
+                <div ref={logsEndRef} />
+              </div>
+            )}
           </div>
         )}
 

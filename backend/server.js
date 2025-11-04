@@ -403,6 +403,56 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+// 单个仓库分析接口
+app.post('/api/analyze-repo', async (req, res) => {
+  try {
+    const { repoPath, branch, sessionId } = req.body;
+    const selectedBranch = branch || '--all';
+    
+    if (!repoPath) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供仓库路径'
+      });
+    }
+    
+    // 检查路径是否存在
+    try {
+      await fs.access(repoPath);
+    } catch (error) {
+      if (sessionId) {
+        sendLog(sessionId, `❌ 仓库路径不存在: ${repoPath}`, 'error');
+      }
+      return res.status(400).json({
+        success: false,
+        message: '仓库路径不存在或无法访问'
+      });
+    }
+    
+    if (sessionId) {
+      sendLog(sessionId, `\n🔄 重新分析仓库: ${path.basename(repoPath)} (${selectedBranch === '--all' ? '所有分支' : selectedBranch})`);
+    }
+    
+    // 分析单个仓库
+    const stats = await analyzeRepository(repoPath, selectedBranch, sessionId);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+    
+  } catch (error) {
+    console.error('单个仓库分析错误:', error);
+    if (req.body.sessionId) {
+      sendLog(req.body.sessionId, `❌ 分析错误: ${error.message}`, 'error');
+    }
+    res.status(500).json({
+      success: false,
+      message: `服务器错误: ${error.message}`
+    });
+  }
+});
+
 // 健康检查接口
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: '服务运行正常' });
