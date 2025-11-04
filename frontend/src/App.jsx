@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
@@ -10,6 +10,66 @@ function App() {
   const [totalStats, setTotalStats] = useState(null)
   const [error, setError] = useState('')
   const [showHelp, setShowHelp] = useState(false)
+  const [logs, setLogs] = useState([])
+  const [showTerminal, setShowTerminal] = useState(false)
+  const eventSourceRef = useRef(null)
+  const logsEndRef = useRef(null)
+  const sessionIdRef = useRef(null)
+
+  // 自动滚动到日志底部
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
+
+  // 清理EventSource连接
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+    }
+  }, [])
+
+  // 连接到日志SSE服务
+  const connectToLogStream = (sessionId) => {
+    // 关闭之前的连接
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
+    const logUrl = `/api/logs/${sessionId}`
+    console.log('🔌 连接到日志服务:', logUrl)
+    
+    const eventSource = new EventSource(logUrl)
+    
+    eventSource.onopen = () => {
+      console.log('✅ SSE连接已建立')
+    }
+    
+    eventSource.onmessage = (event) => {
+      console.log('📨 收到日志:', event.data)
+      try {
+        const data = JSON.parse(event.data)
+        setLogs(prev => [...prev, {
+          message: data.message,
+          type: data.type,
+          timestamp: new Date(data.timestamp)
+        }])
+      } catch (err) {
+        console.error('❌ 解析日志数据失败:', err)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('❌ SSE连接错误:', error)
+      console.log('EventSource状态:', eventSource.readyState)
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('SSE连接已关闭')
+      }
+    }
+
+    eventSourceRef.current = eventSource
+  }
 
   const handleAnalyze = async () => {
     if (!folderPath.trim()) {
@@ -21,11 +81,23 @@ function App() {
     setError('')
     setRepoStats([])
     setTotalStats(null)
+    setLogs([])
+    setShowTerminal(true)
+
+    // 生成唯一的会话ID
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    sessionIdRef.current = sessionId
+    
+    console.log('🆔 会话ID:', sessionId)
+
+    // 连接到日志流
+    connectToLogStream(sessionId)
 
     try {
       const response = await axios.post('/api/analyze', {
         folderPath: folderPath.trim(),
-        branch: selectedBranch
+        branch: selectedBranch,
+        sessionId: sessionId
       })
 
       if (response.data.success) {
@@ -41,6 +113,19 @@ function App() {
     }
   }
 
+  const clearLogs = () => {
+    setLogs([])
+  }
+
+  const getLogColor = (type) => {
+    switch (type) {
+      case 'success': return '#4ade80'
+      case 'error': return '#f87171'
+      case 'warning': return '#fbbf24'
+      default: return '#94a3b8'
+    }
+  }
+
   const formatNumber = (num) => {
     return num?.toLocaleString() || '0'
   }
@@ -52,7 +137,8 @@ function App() {
         <p>自动化统计Git仓库代码量</p>
       </header>
 
-      <div className="container">
+      <div className="app-layout">
+        <div className="main-content">
         {/* 简化的输入区 */}
         <div className="simple-input-section">
           <div className="input-card">
@@ -204,6 +290,67 @@ function App() {
               粘贴文件夹路径 → 选择分支 → 点击分析
             </p>
           </div>
+        )}
+        </div>
+
+        {/* 终端日志窗口 */}
+        {showTerminal && (
+          <div className="terminal-panel">
+            <div className="terminal-header">
+              <div className="terminal-title">
+                <span className="terminal-icon">💻</span>
+                <span>实时日志</span>
+              </div>
+              <div className="terminal-actions">
+                <button 
+                  className="terminal-btn"
+                  onClick={clearLogs}
+                  title="清空日志"
+                >
+                  🗑️
+                </button>
+                <button 
+                  className="terminal-btn"
+                  onClick={() => setShowTerminal(false)}
+                  title="关闭终端"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="terminal-body">
+              {logs.length === 0 ? (
+                <div className="terminal-empty">
+                  等待日志输出...
+                </div>
+              ) : (
+                logs.map((log, index) => (
+                  <div 
+                    key={index} 
+                    className="terminal-log"
+                    style={{ color: getLogColor(log.type) }}
+                  >
+                    <span className="log-time">
+                      [{log.timestamp.toLocaleTimeString()}]
+                    </span>
+                    <span className="log-message">{log.message}</span>
+                  </div>
+                ))
+              )}
+              <div ref={logsEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* 终端切换按钮（当终端关闭时显示） */}
+        {!showTerminal && logs.length > 0 && (
+          <button 
+            className="terminal-toggle-btn"
+            onClick={() => setShowTerminal(true)}
+            title="显示终端日志"
+          >
+            💻 日志
+          </button>
         )}
       </div>
 

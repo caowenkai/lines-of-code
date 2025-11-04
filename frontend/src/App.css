@@ -22,6 +22,18 @@
   font-size: 1.1rem;
 }
 
+/* App布局 - 恢复原始布局 */
+.app-layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  position: relative;
+}
+
+.main-content {
+  width: 100%;
+}
+
 .container {
   max-width: 1400px;
   margin: 0 auto;
@@ -635,5 +647,216 @@
   .help-link {
     margin-left: 0;
     margin-top: 4px;
+  }
+}
+
+/* ===== 终端面板样式 ===== */
+.terminal-panel {
+  position: fixed;
+  top: 180px;
+  right: 2rem;
+  width: 380px;
+  max-height: calc(100vh - 220px);
+  background: #1e1e1e;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.terminal-header {
+  background: #2d2d2d;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #404040;
+  cursor: move;
+}
+
+.terminal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e0e0e0;
+  font-weight: 600;
+  font-size: 13px;
+  user-select: none;
+}
+
+.terminal-icon {
+  font-size: 16px;
+}
+
+.terminal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-btn {
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.terminal-btn:hover {
+  background: #404040;
+}
+
+.terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d4d4d4;
+  background: #1e1e1e;
+}
+
+.terminal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-body::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.terminal-body::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+.terminal-body::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+.terminal-empty {
+  color: #808080;
+  text-align: center;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.terminal-log {
+  margin-bottom: 4px;
+  display: flex;
+  gap: 8px;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.log-time {
+  color: #808080;
+  font-size: 10px;
+  flex-shrink: 0;
+  user-select: none;
+  min-width: 70px;
+}
+
+.log-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* 终端切换按钮 */
+.terminal-toggle-btn {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s;
+  z-index: 100;
+}
+
+.terminal-toggle-btn:hover {
+  background: #404040;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* 响应式 - 终端面板 */
+@media (max-width: 1400px) {
+  .terminal-panel {
+    width: 340px;
+    right: 1rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .terminal-panel {
+    width: 320px;
+    top: 160px;
+  }
+}
+
+@media (max-width: 768px) {
+  .terminal-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-height: 40vh;
+    border-radius: 12px 12px 0 0;
+    animation: slideInUp 0.3s ease-out;
+  }
+
+  @keyframes slideInUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .terminal-body {
+    font-size: 12px;
+  }
+
+  .terminal-toggle-btn {
+    bottom: 1rem;
+    right: 1rem;
+    padding: 10px 16px;
+    font-size: 13px;
   }
 }

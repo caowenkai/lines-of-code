@@ -19,8 +19,72 @@ const PORT = 5280;
 app.use(cors());
 app.use(bodyParser.json());
 
+// 存储所有活跃的SSE连接
+const sseClients = new Map();
+
+// 发送日志到所有SSE客户端
+function sendLog(sessionId, message, type = 'info') {
+  const client = sseClients.get(sessionId);
+  if (client) {
+    const data = JSON.stringify({ 
+      type, 
+      message, 
+      timestamp: new Date().toISOString() 
+    });
+    try {
+      client.write(`data: ${data}\n\n`);
+      // 确保立即刷新数据
+      if (client.flush) {
+        client.flush();
+      }
+    } catch (error) {
+      console.error(`发送日志失败 [${sessionId}]:`, error.message);
+      sseClients.delete(sessionId);
+    }
+  }
+  
+  // 同时打印到控制台
+  console.log(`[${sessionId}] ${message}`);
+}
+
+// SSE endpoint - 用于实时日志推送
+app.get('/api/logs/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  
+  console.log(`[SSE] 新的连接请求: ${sessionId}`);
+  
+  // 设置SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // 禁用nginx缓冲
+  res.flushHeaders(); // 立即发送headers
+  
+  // 保存客户端连接
+  sseClients.set(sessionId, res);
+  
+  // 发送初始连接消息
+  sendLog(sessionId, '✅ 已连接到日志服务器', 'success');
+  
+  // 发送心跳，保持连接
+  const heartbeat = setInterval(() => {
+    if (sseClients.has(sessionId)) {
+      res.write(': heartbeat\n\n');
+    } else {
+      clearInterval(heartbeat);
+    }
+  }, 30000); // 每30秒发送一次心跳
+  
+  // 客户端断开连接时清理
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(sessionId);
+    console.log(`[${sessionId}] 客户端断开连接`);
+  });
+});
+
 // 查找所有Git仓库
-async function findGitRepositories(rootPath) {
+async function findGitRepositories(rootPath, sessionId = null) {
   const repositories = [];
   
   async function searchDirectory(dirPath) {
@@ -37,7 +101,11 @@ async function findGitRepositories(rootPath) {
         if (entry.isDirectory()) {
           // 检查是否是Git仓库
           if (entry.name === '.git') {
-            repositories.push(path.dirname(fullPath));
+            const repoPath = path.dirname(fullPath);
+            repositories.push(repoPath);
+            if (sessionId) {
+              sendLog(sessionId, `📦 发现仓库: ${path.basename(repoPath)}`);
+            }
           } else {
             // 递归搜索子目录
             await searchDirectory(fullPath);
@@ -46,7 +114,12 @@ async function findGitRepositories(rootPath) {
       }
     } catch (error) {
       // 忽略无权限访问的目录
-      console.log(`无法访问目录: ${dirPath}`);
+      const msg = `⚠️  无法访问目录: ${dirPath}`;
+      if (sessionId) {
+        sendLog(sessionId, msg, 'warning');
+      } else {
+        console.log(msg);
+      }
     }
   }
   
@@ -137,26 +210,48 @@ async function getAuthorStats(repoPath, author, branch = '--all') {
 }
 
 // 分析单个仓库
-async function analyzeRepository(repoPath, branch = '--all') {
+async function analyzeRepository(repoPath, branch = '--all', sessionId = null) {
   const repoName = path.basename(repoPath);
   const branchDisplay = branch === '--all' ? '所有分支' : branch;
-  console.log(`正在分析仓库: ${repoName} (${branchDisplay})`);
+  
+  if (sessionId) {
+    sendLog(sessionId, `\n🔍 正在分析仓库: ${repoName} (${branchDisplay})`);
+  } else {
+    console.log(`正在分析仓库: ${repoName} (${branchDisplay})`);
+  }
   
   // 获取分支列表
   const branches = await getRepositoryBranches(repoPath);
   
   const authors = await getRepositoryAuthors(repoPath, branch);
-  console.log(`发现 ${authors.length} 个提交者`);
+  const authorCount = authors.length;
+  
+  if (sessionId) {
+    sendLog(sessionId, `   👥 发现 ${authorCount} 个提交者`);
+  } else {
+    console.log(`发现 ${authorCount} 个提交者`);
+  }
   
   const contributors = [];
   
-  for (const author of authors) {
+  for (let i = 0; i < authors.length; i++) {
+    const author = authors[i];
     const stats = await getAuthorStats(repoPath, author, branch);
     contributors.push(stats);
+    
+    if (sessionId) {
+      sendLog(sessionId, `   ⚙️  处理中 [${i + 1}/${authorCount}]: ${author}`);
+    }
   }
   
   // 按总改动量排序
   contributors.sort((a, b) => b.totalChanges - a.totalChanges);
+  
+  if (sessionId) {
+    const totalChanges = contributors.reduce((sum, c) => sum + c.totalChanges, 0);
+    const totalCommits = contributors.reduce((sum, c) => sum + c.commits, 0);
+    sendLog(sessionId, `   ✅ 仓库分析完成 - ${formatNumber(totalChanges)} 行改动，${formatNumber(totalCommits)} 次提交`);
+  }
   
   return {
     name: repoName,
@@ -167,10 +262,15 @@ async function analyzeRepository(repoPath, branch = '--all') {
   };
 }
 
+// 格式化数字
+function formatNumber(num) {
+  return num?.toLocaleString() || '0';
+}
+
 // 主分析接口
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { folderPath, branch } = req.body;
+    const { folderPath, branch, sessionId } = req.body;
     const selectedBranch = branch || '--all';
     
     if (!folderPath) {
@@ -184,19 +284,34 @@ app.post('/api/analyze', async (req, res) => {
     try {
       await fs.access(folderPath);
     } catch (error) {
+      if (sessionId) {
+        sendLog(sessionId, '❌ 文件夹路径不存在或无法访问', 'error');
+      }
       return res.status(400).json({
         success: false,
         message: '文件夹路径不存在或无法访问'
       });
     }
     
+    if (sessionId) {
+      sendLog(sessionId, `\n🚀 开始扫描文件夹: ${folderPath}`);
+      sendLog(sessionId, `📋 统计分支: ${selectedBranch === '--all' ? '所有分支' : selectedBranch}`);
+    }
     console.log(`开始扫描文件夹: ${folderPath}`);
     
     // 查找所有Git仓库
-    const repositories = await findGitRepositories(folderPath);
+    const repositories = await findGitRepositories(folderPath, sessionId);
+    
+    if (sessionId) {
+      sendLog(sessionId, `\n📊 扫描完成！发现 ${repositories.length} 个Git仓库\n`);
+    }
     console.log(`发现 ${repositories.length} 个Git仓库`);
     
     if (repositories.length === 0) {
+      if (sessionId) {
+        sendLog(sessionId, '⚠️  未找到Git仓库', 'warning');
+        sendLog(sessionId, '✅ 分析完成', 'success');
+      }
       return res.json({
         success: true,
         message: '未找到Git仓库',
@@ -215,9 +330,18 @@ app.post('/api/analyze', async (req, res) => {
     }
     
     // 分析每个仓库
+    if (sessionId) {
+      sendLog(sessionId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      sendLog(sessionId, '🔎 开始详细分析...\n');
+    }
+    
     const repoStats = [];
-    for (const repoPath of repositories) {
-      const stats = await analyzeRepository(repoPath, selectedBranch);
+    for (let i = 0; i < repositories.length; i++) {
+      const repoPath = repositories[i];
+      if (sessionId) {
+        sendLog(sessionId, `[${i + 1}/${repositories.length}] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      }
+      const stats = await analyzeRepository(repoPath, selectedBranch, sessionId);
       repoStats.push(stats);
     }
     
@@ -238,6 +362,20 @@ app.post('/api/analyze', async (req, res) => {
       });
     });
     
+    if (sessionId) {
+      sendLog(sessionId, '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      sendLog(sessionId, '📈 总体统计结果');
+      sendLog(sessionId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      sendLog(sessionId, `   📁 仓库总数: ${repositories.length}`);
+      sendLog(sessionId, `   👥 提交者总数: ${allContributors.size}`);
+      sendLog(sessionId, `   ➕ 总添加行数: ${formatNumber(totalAdded)}`);
+      sendLog(sessionId, `   ➖ 总删除行数: ${formatNumber(totalDeleted)}`);
+      sendLog(sessionId, `   📊 总改动量: ${formatNumber(totalChanges)}`);
+      sendLog(sessionId, `   🔄 总提交次数: ${formatNumber(totalCommits)}`);
+      sendLog(sessionId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      sendLog(sessionId, '✨ 所有分析任务已完成！', 'success');
+    }
+    
     res.json({
       success: true,
       data: {
@@ -255,6 +393,9 @@ app.post('/api/analyze', async (req, res) => {
     
   } catch (error) {
     console.error('分析错误:', error);
+    if (req.body.sessionId) {
+      sendLog(req.body.sessionId, `❌ 分析错误: ${error.message}`, 'error');
+    }
     res.status(500).json({
       success: false,
       message: `服务器错误: ${error.message}`
