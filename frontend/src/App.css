@@ -132,8 +132,13 @@
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+  .button-group {
+    display: flex;
+    gap: 12px;
+}
+
 .analyze-btn {
-  width: 100%;
+    flex: 1;
   padding: 16px;
   font-size: 18px;
   font-weight: 600;
@@ -159,6 +164,34 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+  .demo-btn {
+    padding: 16px 32px;
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+    white-space: nowrap;
+  }
+  
+  .demo-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+  }
+  
+  .demo-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
+  .demo-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 
 /* ===== 模态框样式 ===== */
 .modal-overlay {
@@ -394,10 +427,42 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
 .summary-card h2 {
   font-size: 1.8rem;
   color: #333;
-  margin-bottom: 1.5rem;
+  margin: 0;
+}
+
+.export-all-btn {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(17, 153, 142, 0.4);
+}
+
+.export-all-btn:active {
+  transform: translateY(0);
 }
 
 .summary-grid {
@@ -515,12 +580,19 @@
   margin-top: 4px;
 }
 
+/* 仓库控制区 */
+.repo-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 /* 分支选择器 */
 .repo-branch-selector {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
 }
 
 .branch-label {
@@ -575,6 +647,37 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 单个仓库导出按钮 */
+.export-repo-btn {
+  padding: 8px 16px;
+  font-size: 18px;
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(17, 153, 142, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+}
+
+.export-repo-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
+}
+
+.export-repo-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.export-repo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 仓库加载遮罩 */
@@ -781,25 +884,56 @@
     padding: 24px;
   }
 
+  .button-group {
+    flex-direction: column;
+  }
+
+  .demo-btn {
+    padding: 14px;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-    .repo-title {
-      font-size: 1.2rem;
-    }
+  .repo-title {
+    font-size: 1.2rem;
+  }
   
     .repo-header {
       flex-direction: column;
       align-items: stretch;
     }
   
+    .repo-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+  
     .repo-branch-selector {
+      width: 100%;
       justify-content: space-between;
     }
   
     .branch-select {
       flex: 1;
+    }
+  
+    .export-repo-btn {
+      width: 100%;
+      padding: 12px;
+    }
+  
+    .summary-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+  
+    .export-all-btn {
+      width: 100%;
+      justify-content: center;
     }
   
     .loading-spinner-large {
@@ -813,8 +947,8 @@
     .loading-subtext {
       font-size: 0.85rem;
     }
-  
-    .stats-table {
+
+  .stats-table {
     font-size: 0.85rem;
   }
 

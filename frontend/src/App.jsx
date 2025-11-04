@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
+import * as XLSX from 'xlsx'
 import './App.css'
 
 function App() {
@@ -71,6 +72,37 @@ function App() {
     }
 
     eventSourceRef.current = eventSource
+  }
+
+  // 加载演示数据
+  const handleLoadDemo = async () => {
+    setLoading(true)
+    setError('')
+    setRepoStats([])
+    setTotalStats(null)
+    setLogs([])
+    setShowTerminal(false)
+
+    try {
+      const response = await axios.get('/api/demo')
+      
+      if (response.data.success) {
+        // 为每个仓库添加currentBranch
+        const reposWithBranch = response.data.data.repositories.map(repo => ({
+          ...repo,
+          currentBranch: '--all'
+        }))
+        setRepoStats(reposWithBranch)
+        setTotalStats(response.data.data.total)
+        setFolderPath('/Users/developer/projects')
+      } else {
+        setError('加载演示数据失败')
+      }
+    } catch (err) {
+      setError('加载演示数据失败，请确保后端服务已启动')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleAnalyze = async () => {
@@ -209,6 +241,132 @@ function App() {
     return num?.toLocaleString() || '0'
   }
 
+  // 导出单个仓库数据为Excel
+  const exportSingleRepo = (repo) => {
+    // 创建工作簿
+    const wb = XLSX.utils.book_new()
+    
+    // 准备数据
+    const data = [
+      ['仓库名称', repo.name],
+      ['路径', repo.path],
+      ['分支', repo.branch || repo.currentBranch === '--all' ? '所有分支' : repo.currentBranch],
+      ['提交者总数', repo.contributors.length],
+      [],
+      ['排名', '提交者', '添加行数', '删除行数', '总改动量', '提交次数']
+    ]
+    
+    // 添加贡献者数据
+    repo.contributors.forEach((contributor, index) => {
+      data.push([
+        index + 1,
+        contributor.author,
+        contributor.added,
+        contributor.deleted,
+        contributor.totalChanges,
+        contributor.commits
+      ])
+    })
+    
+    // 创建工作表
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    
+    // 设置列宽
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 }
+    ]
+    
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(wb, ws, repo.name.substring(0, 31))
+    
+    // 生成文件名
+    const fileName = `${repo.name}_代码统计_${new Date().toISOString().split('T')[0]}.xlsx`
+    
+    // 下载文件
+    XLSX.writeFile(wb, fileName)
+  }
+
+  // 导出全部仓库数据为Excel
+  const exportAllRepos = () => {
+    if (repoStats.length === 0) {
+      setError('没有可导出的数据')
+      return
+    }
+    
+    // 创建工作簿
+    const wb = XLSX.utils.book_new()
+    
+    // 添加总体统计工作表
+    if (totalStats) {
+      const summaryData = [
+        ['代码统计总体报告'],
+        ['生成时间', new Date().toLocaleString()],
+        ['统计路径', folderPath || '-'],
+        [],
+        ['指标', '数值'],
+        ['仓库总数', totalStats.repositoryCount],
+        ['提交者总数', totalStats.contributorCount],
+        ['总添加行数', totalStats.totalAdded],
+        ['总删除行数', totalStats.totalDeleted],
+        ['总改动量', totalStats.totalChanges],
+        ['总提交次数', totalStats.totalCommits]
+      ]
+      
+      const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+      summaryWs['!cols'] = [{ wch: 20 }, { wch: 20 }]
+      XLSX.utils.book_append_sheet(wb, summaryWs, '总体统计')
+    }
+    
+    // 为每个仓库创建一个工作表
+    repoStats.forEach((repo, index) => {
+      const data = [
+        ['仓库信息'],
+        ['名称', repo.name],
+        ['路径', repo.path],
+        ['分支', repo.branch || (repo.currentBranch === '--all' ? '所有分支' : repo.currentBranch)],
+        ['提交者总数', repo.contributors.length],
+        [],
+        ['排名', '提交者', '添加行数', '删除行数', '总改动量', '提交次数']
+      ]
+      
+      repo.contributors.forEach((contributor, idx) => {
+        data.push([
+          idx + 1,
+          contributor.author,
+          contributor.added,
+          contributor.deleted,
+          contributor.totalChanges,
+          contributor.commits
+        ])
+      })
+      
+      const ws = XLSX.utils.aoa_to_sheet(data)
+      ws['!cols'] = [
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 12 }
+      ]
+      
+      // 工作表名称最长31个字符
+      const sheetName = repo.name.substring(0, 31)
+      XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    })
+    
+    // 生成文件名
+    const fileName = `代码统计报告_${new Date().toISOString().split('T')[0]}.xlsx`
+    
+    // 下载文件
+    XLSX.writeFile(wb, fileName)
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -259,13 +417,23 @@ function App() {
               </select>
             </div>
 
-            <button 
-              className="analyze-btn"
-              onClick={handleAnalyze}
-              disabled={loading}
-            >
-              {loading ? '⏳ 分析中...' : '🚀 开始分析'}
-            </button>
+            <div className="button-group">
+              <button 
+                className="analyze-btn"
+                onClick={handleAnalyze}
+                disabled={loading}
+              >
+                {loading ? '⏳ 分析中...' : '🚀 开始分析'}
+              </button>
+              <button 
+                className="demo-btn"
+                onClick={handleLoadDemo}
+                disabled={loading}
+                title="加载演示数据用于预览效果"
+              >
+                🎨 演示数据
+              </button>
+            </div>
           </div>
         </div>
 
@@ -277,7 +445,16 @@ function App() {
 
         {totalStats && (
           <div className="summary-card">
-            <h2>📈 总体统计</h2>
+            <div className="summary-header">
+              <h2>📈 总体统计</h2>
+              <button 
+                className="export-all-btn"
+                onClick={exportAllRepos}
+                title="下载全部数据为Excel"
+              >
+                📥 下载全部
+              </button>
+            </div>
             <div className="summary-grid">
               <div className="summary-item">
                 <span className="summary-label">仓库总数</span>
@@ -323,7 +500,8 @@ function App() {
                       <span className="repo-path">{repo.path}</span>
                     </div>
                     
-                    <div className="repo-branch-selector">
+                    <div className="repo-controls">
+                      <div className="repo-branch-selector">
                       <label htmlFor={`branch-${index}`} className="branch-label">
                         🌳 分支:
                       </label>
@@ -340,6 +518,15 @@ function App() {
                         ))}
                       </select>
                       {isRepoLoading && <span className="loading-spinner">⏳</span>}
+                      </div>
+                      <button 
+                        className="export-repo-btn"
+                        onClick={() => exportSingleRepo(repo)}
+                        title="下载此仓库数据"
+                        disabled={isRepoLoading}
+                      >
+                        📥
+                      </button>
                     </div>
                   </div>
                   

@@ -453,6 +453,98 @@ app.post('/api/analyze-repo', async (req, res) => {
   }
 });
 
+// 演示数据接口
+app.get('/api/demo', (req, res) => {
+  const demoData = {
+    success: true,
+    data: {
+      repositories: [
+        {
+          name: 'awesome-web-app',
+          path: '/Users/developer/projects/awesome-web-app',
+          branch: '所有分支',
+          currentBranch: '--all',
+          branches: ['main', 'develop', 'feature/dashboard', 'feature/auth'],
+          contributors: [
+            { author: 'Alice Chen', added: 45678, deleted: 12345, totalChanges: 58023, commits: 234 },
+            { author: 'Bob Zhang', added: 38920, deleted: 9876, totalChanges: 48796, commits: 189 },
+            { author: 'Charlie Wang', added: 32156, deleted: 8234, totalChanges: 40390, commits: 156 },
+            { author: 'David Liu', added: 28940, deleted: 7123, totalChanges: 36063, commits: 142 },
+            { author: 'Emma Zhou', added: 21345, deleted: 5678, totalChanges: 27023, commits: 98 }
+          ]
+        },
+        {
+          name: 'mobile-analytics',
+          path: '/Users/developer/projects/mobile-analytics',
+          branch: '所有分支',
+          currentBranch: '--all',
+          branches: ['main', 'develop', 'release/v2.0'],
+          contributors: [
+            { author: 'Frank Li', added: 52341, deleted: 15234, totalChanges: 67575, commits: 278 },
+            { author: 'Grace Wu', added: 41256, deleted: 11890, totalChanges: 53146, commits: 201 },
+            { author: 'Henry Xu', added: 35678, deleted: 9234, totalChanges: 44912, commits: 167 },
+            { author: 'Iris Yang', added: 29876, deleted: 7654, totalChanges: 37530, commits: 134 },
+            { author: 'Jack Ma', added: 23456, deleted: 6123, totalChanges: 29579, commits: 105 },
+            { author: 'Kate Lin', added: 18234, deleted: 4567, totalChanges: 22801, commits: 87 }
+          ]
+        },
+        {
+          name: 'data-pipeline',
+          path: '/Users/developer/projects/data-pipeline',
+          branch: '所有分支',
+          currentBranch: '--all',
+          branches: ['main', 'feature/optimization'],
+          contributors: [
+            { author: 'Leo Zhao', added: 38567, deleted: 10234, totalChanges: 48801, commits: 195 },
+            { author: 'Mia Sun', added: 31245, deleted: 8456, totalChanges: 39701, commits: 158 },
+            { author: 'Nina Gao', added: 27890, deleted: 7123, totalChanges: 35013, commits: 142 },
+            { author: 'Oscar Chen', added: 19876, deleted: 5234, totalChanges: 25110, commits: 98 }
+          ]
+        },
+        {
+          name: 'ai-recommendation',
+          path: '/Users/developer/projects/ai-recommendation',
+          branch: '所有分支',
+          currentBranch: '--all',
+          branches: ['main', 'develop', 'experiment/ml-v3'],
+          contributors: [
+            { author: 'Paul Wang', added: 56789, deleted: 16543, totalChanges: 73332, commits: 312 },
+            { author: 'Quinn Liu', added: 48923, deleted: 13456, totalChanges: 62379, commits: 256 },
+            { author: 'Rose Zhang', added: 42156, deleted: 11234, totalChanges: 53390, commits: 218 },
+            { author: 'Sam Lee', added: 35678, deleted: 9876, totalChanges: 45554, commits: 187 },
+            { author: 'Tina Hu', added: 28901, deleted: 7654, totalChanges: 36555, commits: 145 },
+            { author: 'Uma Chen', added: 21234, deleted: 5432, totalChanges: 26666, commits: 102 },
+            { author: 'Victor Wu', added: 15678, deleted: 4123, totalChanges: 19801, commits: 76 }
+          ]
+        },
+        {
+          name: 'api-gateway',
+          path: '/Users/developer/projects/api-gateway',
+          branch: '所有分支',
+          currentBranch: '--all',
+          branches: ['main', 'develop', 'hotfix/security'],
+          contributors: [
+            { author: 'Wendy Zhao', added: 33456, deleted: 9234, totalChanges: 42690, commits: 176 },
+            { author: 'Xavier Li', added: 27890, deleted: 7456, totalChanges: 35346, commits: 143 },
+            { author: 'Yuki Tanaka', added: 22345, deleted: 6123, totalChanges: 28468, commits: 118 },
+            { author: 'Zack Brown', added: 18234, deleted: 4987, totalChanges: 23221, commits: 94 }
+          ]
+        }
+      ],
+      total: {
+        repositoryCount: 5,
+        contributorCount: 26,
+        totalAdded: 856234,
+        totalDeleted: 234567,
+        totalChanges: 1090801,
+        totalCommits: 4891
+      }
+    }
+  };
+  
+  res.json(demoData);
+});
+
 // 健康检查接口
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: '服务运行正常' });
