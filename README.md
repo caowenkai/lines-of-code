@@ -1,4 +1,4 @@
-# 📊 代码统计工具
+# 📊 代码统计工具（谁是卷王？）
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
