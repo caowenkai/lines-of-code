@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/python-%3E%3D3.6-blue.svg)](https://www.python.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-一个自动化统计 Git 仓库代码量的全栈工具，支持批量分析多个仓库，统计每个提交者的代码贡献。
+一个自动化统计 Git 仓库代码量的全栈工具，支持批量分析多个仓库，统计每个提交者的代码贡献。（#代码统计 #统计代码 #代码量 #代码行数）
 
 ## 📚 文档导航
 
